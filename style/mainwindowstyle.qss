@@ -1,0 +1,39 @@
+/* mainwindowstyle.qss - 全局样式表示例 */
+
+/* 基本按钮样式 */
+QPushButton[role="appButton"] {
+    background-color: #E0E0E0;
+    border-radius: 20px;
+    min-width: 100px;
+    min-height: 100px;
+    font-size: 16px;
+}
+QPushButton[role="appButton"]:pressed {
+    background-color: #C8C8C8;
+}
+
+/* 禁用样式（占位） */
+QPushButton[disabledRole="true"] {
+    background-color: #CFCFCF;
+}
+
+/* 时间按钮 */
+#timeButton, #timeButton2 {
+    background-color: #F0F0F0;
+    border-radius: 20px;
+    font-weight: bold;
+}
+#timeButton:pressed, #timeButton2:pressed {
+    background-color: #D0D0D0;
+}
+
+/* 通用 label */
+QLabel {
+    color: #000000;
+}
+
+/* 占位页按钮 */
+QPushButton {
+    padding: 8px 12px;
+    border-radius: 8px;
+}
