@@ -55,7 +55,6 @@ VideoPlayer::~VideoPlayer()
 {
     if (videoPlayer) {
         videoPlayer->stop();
-        videoPlayer->setVideoOutput(nullptr);
     }
 }
 

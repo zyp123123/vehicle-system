@@ -1,6 +1,6 @@
 QT += core gui
 QT += multimedia multimediawidgets
-QT += concurrent charts
+QT += concurrent charts mqtt sql
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 CONFIG += c++11
@@ -18,15 +18,13 @@ SOURCES += \
 HEADERS += \
     mainwindow.h
 
-FORMS += \
-    mainwindow.ui
-
 # 部署规则
 qnx: target.path = /tmp/$${TARGET}/bin
 else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 RESOURCES += \
+    res.qrc \
     res.qrc
 
 # 自动区分 x86 与 ARM
@@ -55,6 +53,7 @@ contains(QT_ARCH, arm) {
 
 # 包含其他项目文件
 include(apps/apps.pri)
+include(tools/tools.pri)
 
 # 编译器标志
 QMAKE_CXXFLAGS += -Wno-deprecated-copy

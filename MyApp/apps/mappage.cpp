@@ -3,7 +3,6 @@
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
-#include <QGridLayout>
 #include <QWebEngineView>
 #include <QWebChannel>
 #include <QLineEdit>
@@ -16,9 +15,10 @@
 #include <QGroupBox>
 #include <QFile>
 
-MapPage::MapPage(QWidget *parent) : QWidget(parent)
+MapPage::MapPage(QWidget *parent)
+    : QWidget(parent)
 {
-    qputenv("QTWEBENGINE_REMOTE_DEBUGGING", "7777");  // 开启远程调试
+    qputenv("QTWEBENGINE_REMOTE_DEBUGGING", "7777");
 
     // 1. 初始化数据模型和通信通道
     m_channel = new myChannel(this);
@@ -33,19 +33,17 @@ MapPage::MapPage(QWidget *parent) : QWidget(parent)
     webChannel->registerObject("qtChannel", m_channel);
     m_webView->page()->setWebChannel(webChannel);
 
-    // ★★★ 加上这行调试代码 ★★★
-    QFile file(":/mymap_ba.html");  // 注意冒号开头，等同于 qrc:/
+    // 资源文件校验
+    QFile file(":/mymap_ba.html");
     if(file.exists()) {
         qDebug() << "HTML file FOUND success!";
     } else {
-        qDebug() << "HTML file NOT FOUND! Please check .qrc prefix.";
+        qDebug() << "HTML file NOT FOUND!";
     }
 
-    // 注意：这里假设你的资源文件里有 mymap_ba.html
     m_webView->load(QUrl("qrc:/mymap_ba.html"));
 
     // 4. 连接信号槽
-    // UI -> Logic
     connect(m_setCityBtn, &QPushButton::clicked, this, &MapPage::onSetCityClicked);
     connect(m_startSearchEdit, &QLineEdit::textEdited, this, &MapPage::onSearch1Changed);
     connect(m_endSearchEdit, &QLineEdit::textEdited, this, &MapPage::onSearch2Changed);
@@ -53,7 +51,6 @@ MapPage::MapPage(QWidget *parent) : QWidget(parent)
     connect(m_startListView, &QListView::clicked, this, &MapPage::onStartListClicked);
     connect(m_endListView, &QListView::clicked, this, &MapPage::onEndListClicked);
 
-    // Channel -> Logic/UI
     connect(m_channel, &myChannel::routeError, this, &MapPage::handleRouteError);
     connect(m_channel, &myChannel::setCityLable, this, &MapPage::updateCityLabel);
     connect(m_channel, &myChannel::sendAutocomplete_1, this, &MapPage::updateAutoComplete_1);
@@ -64,20 +61,34 @@ MapPage::~MapPage()
 {
 }
 
+void MapPage::fillNavigationData(const QString &city, const QString &start, const QString &end)
+{
+    m_cityEdit->setText(city);
+    m_startSearchEdit->setText(start);
+    m_endSearchEdit->setText(end);
+
+    onSearch1Changed(start);
+    onSearch2Changed(end);
+
+    checkRouteStatus();
+    onNavButtonClicked();
+}
+
+QImage MapPage::captureMapImage()
+{
+    return this->grab().toImage();
+}
+
 void MapPage::setupUI()
 {
-    // 主布局：水平 (左边地图，右边菜单)
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
 
-    // --- 左边：地图 ---
     m_webView = new QWebEngineView(this);
-    // 地图占据更多空间 (比如 3:1)
     mainLayout->addWidget(m_webView, 3);
 
-    // --- 右边：菜单栏 ---
     QWidget *rightPanel = new QWidget(this);
-    rightPanel->setFixedWidth(300);  // 或者使用 layout stretch
+    rightPanel->setFixedWidth(300);
     QVBoxLayout *rightLayout = new QVBoxLayout(rightPanel);
 
     // 1. 城市设置区域
@@ -94,7 +105,7 @@ void MapPage::setupUI()
     cityLayout->addWidget(m_cityLabel);
     rightLayout->addWidget(cityGroup);
 
-    // 2. 起点搜索区域
+    // 2. 起点设置区域
     QGroupBox *startGroup = new QGroupBox("起点设置", this);
     QVBoxLayout *startLayout = new QVBoxLayout(startGroup);
     m_startSearchEdit = new QLineEdit(this);
@@ -105,7 +116,7 @@ void MapPage::setupUI()
     startLayout->addWidget(m_startListView);
     rightLayout->addWidget(startGroup);
 
-    // 3. 终点搜索区域
+    // 3. 终点设置区域
     QGroupBox *endGroup = new QGroupBox("终点设置", this);
     QVBoxLayout *endLayout = new QVBoxLayout(endGroup);
     m_endSearchEdit = new QLineEdit(this);
@@ -119,14 +130,12 @@ void MapPage::setupUI()
     // 4. 导航按钮
     m_navBtn = new QPushButton("开始导航", this);
     m_navBtn->setFixedHeight(40);
-    m_navBtn->setEnabled(false);  // 初始禁用
+    m_navBtn->setEnabled(false);
     rightLayout->addWidget(m_navBtn);
 
-    // 将右侧面板加入主布局
     mainLayout->addWidget(rightPanel, 1);
 }
 
-// ---- 逻辑实现 ----
 void MapPage::onSetCityClicked()
 {
     QString city = m_cityEdit->text().trimmed();
@@ -134,7 +143,7 @@ void MapPage::onSetCityClicked()
         QMessageBox::warning(this, "Warning", "Please enter a city!");
         return;
     }
-    m_channel->setCity(city);
+    m_channel->sendCity(city);
 }
 
 void MapPage::updateCityLabel(QString city)
@@ -144,12 +153,12 @@ void MapPage::updateCityLabel(QString city)
 
 void MapPage::onSearch1Changed(const QString &text)
 {
-    m_channel->inputChanged_1(text.trimmed());
+    m_channel->sendInput_1(text.trimmed());
 }
 
 void MapPage::onSearch2Changed(const QString &text)
 {
-    m_channel->inputChanged_2(text.trimmed());
+    m_channel->sendInput_2(text.trimmed());
 }
 
 void MapPage::updateAutoComplete_1(QJsonObject result)
@@ -162,13 +171,21 @@ void MapPage::updateAutoComplete_1(QJsonObject result)
         QJsonObject d = e.toObject();
         if (d.contains("name") && d.contains("location")) {
             QJsonObject locationObj = d["location"].toObject();
-            double lng = locationObj["lng"].toDouble();
-            double lat = locationObj["lat"].toDouble();
-            QString locationStr = QString("%1,%2").arg(lng, 0, 'f', 6).arg(lat, 0, 'f', 6);
+            QString locationStr = QString("%1,%2").arg(locationObj["lng"].toDouble(), 0, 'f', 6)
+                                                  .arg(locationObj["lat"].toDouble(), 0, 'f', 6);
             QStandardItem *item = new QStandardItem(d["name"].toString());
             item->setData(locationStr, Qt::UserRole);
             m_startModel->appendRow(item);
         }
+    }
+    if (m_startModel->rowCount() > 0) {
+        m_autoStartReady1 = false;
+        QModelIndex first = m_startModel->index(0, 0);
+        m_startListView->blockSignals(true);
+        m_startListView->setCurrentIndex(first);
+        m_startListView->blockSignals(false);
+        onStartListClicked(first);
+        m_autoStartReady1 = true;
     }
 }
 
@@ -182,47 +199,61 @@ void MapPage::updateAutoComplete_2(QJsonObject result)
         QJsonObject d = e.toObject();
         if (d.contains("name") && d.contains("location")) {
             QJsonObject locationObj = d["location"].toObject();
-            double lng = locationObj["lng"].toDouble();
-            double lat = locationObj["lat"].toDouble();
-            QString locationStr = QString("%1,%2").arg(lng, 0, 'f', 6).arg(lat, 0, 'f', 6);
+            QString locationStr = QString("%1,%2").arg(locationObj["lng"].toDouble(), 0, 'f', 6)
+                                                  .arg(locationObj["lat"].toDouble(), 0, 'f', 6);
             QStandardItem *item = new QStandardItem(d["name"].toString());
             item->setData(locationStr, Qt::UserRole);
             m_endModel->appendRow(item);
         }
     }
+    if (m_endModel->rowCount() > 0) {
+        m_autoStartReady2 = false;
+        QModelIndex first = m_endModel->index(0, 0);
+        m_endListView->blockSignals(true);
+        m_endListView->setCurrentIndex(first);
+        m_endListView->blockSignals(false);
+        onEndListClicked(first);
+        m_autoStartReady2 = true;
+    }
+    tryAutoStartNavigation();
 }
 
 void MapPage::onStartListClicked(const QModelIndex &index)
 {
     QString locationStr = index.data(Qt::UserRole).toString();
-    qDebug() << "Start Location Selected:" << locationStr;
-    m_channel->startlocation(locationStr);
+    m_channel->sendStartLocation(locationStr);
+    m_hasStart = true;
     checkRouteStatus();
 }
 
 void MapPage::onEndListClicked(const QModelIndex &index)
 {
     QString locationStr = index.data(Qt::UserRole).toString();
-    qDebug() << "End Location Selected:" << locationStr;
-    m_channel->endlocation(locationStr);
+    m_channel->sendEndLocation(locationStr);
+    m_hasEnd = true;
     checkRouteStatus();
 }
 
 void MapPage::checkRouteStatus()
 {
-    // 这里简单的判断逻辑：只要两个搜索列表都有内容，并且用户都点击过了(通常需要更严格的状态记录，
-    // 但为了保持原代码逻辑，这里只开启按钮，实际依赖 web 端的状态)
-    // 更好的做法是增加成员变量 bool m_hasStart, m_hasEnd，点击列表时置为 true
     m_navBtn->setEnabled(true);
 }
 
 void MapPage::onNavButtonClicked()
 {
-    // 如果需要更严格检查，可以在这里判断 m_hasStart && m_hasEnd
-    m_channel->selectRoute();
+    if (m_hasStart && m_hasEnd) {
+        m_channel->sendSelectRoute();
+    }
 }
 
 void MapPage::handleRouteError(QString msg)
 {
     QMessageBox::critical(this, "坐标错误", msg);
+}
+
+void MapPage::tryAutoStartNavigation()
+{
+    if (m_autoStartReady1 && m_autoStartReady2 && m_hasStart && m_hasEnd) {
+        onNavButtonClicked();
+    }
 }

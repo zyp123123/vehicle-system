@@ -372,3 +372,20 @@ void Album::deleteSelectedImages()
 
     buildGrid();
 }
+
+/* -------------------------
+ * 事件过滤
+ * ------------------------ */
+bool Album::eventFilter(QObject *obj, QEvent *event)
+{
+    // 目前不处理，交给父类
+    return QWidget::eventFilter(obj, event);
+}
+
+/* -------------------------
+ * 键盘事件
+ * ------------------------ */
+void Album::keyPressEvent(QKeyEvent *event)
+{
+    QWidget::keyPressEvent(event);
+}

@@ -5,18 +5,19 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QJsonObject>
+#include "mappage.h"
 
 class MapServer : public QObject
 {
     Q_OBJECT
 public:
-    explicit MapServer(QObject *parent = nullptr);
-
-    // 启动 TCP 服务
+    explicit MapServer(MapPage *page, QObject *parent=nullptr);
     bool start(quint16 port);
+    void sendMapImage();   // 发送地图截图到客户端（二进制流格式）
 
 signals:
     void logMessage(const QString &msg);
+    void navigationCommand(const QString &city, const QString &start, const QString &end);
 
 private slots:
     void onNewConnection();
@@ -25,11 +26,7 @@ private slots:
 private:
     QTcpServer *tcpServer;
     QTcpSocket *currentClient;
-
-    // 保存客户端发送的数据
-    QString city;
-    QString startLocation;   // 修改名称，避免和 start() 函数冲突
-    QString endLocation;     // 修改名称
+    MapPage    *mapPage; // 指向 MapPage 实例
 };
 
 #endif // MAPSERVER_H

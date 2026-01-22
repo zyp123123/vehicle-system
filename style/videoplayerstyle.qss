@@ -136,5 +136,3 @@ border-image:url(:/icons/btn_screen1.png);
 QPushButton#btn_screen:checked:hover {
 border-image:url(:/icons/btn_screen2.png);
 }
-
-
