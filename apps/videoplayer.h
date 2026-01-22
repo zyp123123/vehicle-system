@@ -10,64 +10,85 @@
 #include <QHBoxLayout>
 #include <QListWidget>
 #include <QLabel>
+#include <QSpacerItem>
 #include <QVideoWidget>
+#include <QDebug>
 #include <QVector>
-
 #include "tools/mediaobjectinfo.h"
 
 class VideoPlayer : public QWidget
 {
     Q_OBJECT
+
 public:
-    explicit VideoPlayer(QWidget *parent = nullptr);
+    VideoPlayer(QWidget *parent = nullptr);
     ~VideoPlayer();
+
+private:
+    /* 媒体播放器，用于播放视频 */
+    QMediaPlayer *videoPlayer;
+    /* 媒体列表 */
+    QMediaPlaylist *mediaPlaylist;
+    /* 视频显示窗口 */
+    QVideoWidget *videoWidget;
+    /* 视频列表 */
+    QListWidget *listWidget;
+    /* 播放进度条 */
+    QSlider *durationSlider;
+    /* 音量条 */
+    QSlider *volumeSlider;
+    /* 视频播放器按钮 */
+    QPushButton *pushButton[5];
+    /* 水平布局 */
+    QHBoxLayout *hBoxLayout[3];
+    /* 水平容器 */
+    QWidget *hWidget[3];
+    /* 标签文本 */
+    QLabel *label[2];
+    /* 垂直容器 */
+    QWidget *vWidget[2];
+    /* 垂直界面 */
+    QVBoxLayout *vBoxLayout[2];
+
+    /* 视频布局函数 */
+    void videoLayout();
+    /* 主窗体大小重设大小函数重写 */
+    void resizeEvent(QResizeEvent *event);
+    /* 媒体信息存储 */
+    QVector<MediaObjectInfo> mediaObjectInfo;
+    /* 扫描本地视频文件 */
+    void scanVideoFiles();
+    /* 媒体初始化 */
+    void mediaPlayerInit();
+
+private slots:
+    /* 播放按钮点击 */
+    void btn_play_clicked();
+    /* 下一个视频按钮点击 */
+    void btn_next_clicked();
+    /* 音量加 */
+    void btn_volmeup_clicked();
+    /* 音量减 */
+    void btn_volmedown_clicked();
+    /* 全屏 */
+    void btn_fullscreen_clicked();
+    /* 媒体状态改变 */
+    void mediaPlayerStateChanged(QMediaPlayer::State);
+    /* 列表单击 */
+    void listWidgetClicked(QListWidgetItem*);
+    /* 媒体列表项改变 */
+    void mediaPlaylistCurrentIndexChanged(int);
+    /* 媒体总长度改变 */
+    void musicPlayerDurationChanged(qint64);
+    /* 媒体播放位置改变 */
+    void mediaPlayerPositionChanged(qint64);
+    /* 播放进度条松开 */
+    void durationSliderReleased();
+    /* 音量条松开 */
+    void volumeSliderReleased();
 
 signals:
     void requestClose();
-
-protected:
-    void resizeEvent(QResizeEvent *event) override;
-
-private slots:
-    void btn_play_clicked();
-    void btn_next_clicked();
-    void btn_volmeup_clicked();
-    void btn_volmedown_clicked();
-    void btn_fullscreen_clicked();
-
-    void mediaPlayerStateChanged(QMediaPlayer::State state);
-    void listWidgetClicked(QListWidgetItem *item);
-    void mediaPlaylistCurrentIndexChanged(int index);
-
-    void musicPlayerDurationChanged(qint64 duration);
-    void mediaPlayerPositionChanged(qint64 position);
-    void durationSliderReleased();
-    void volumeSliderReleased();
-
-private:
-    /* Media */
-    QMediaPlayer   *videoPlayer;
-    QMediaPlaylist *mediaPlaylist;
-    QVideoWidget   *videoWidget;
-
-    /* UI */
-    QListWidget *listWidget;
-    QSlider *durationSlider;
-    QSlider *volumeSlider;
-    QPushButton *pushButton[5];
-    QLabel *label[2];
-
-    QHBoxLayout *hBoxLayout[3];
-    QWidget *hWidget[3];
-    QWidget *vWidget[2];
-    QVBoxLayout *vBoxLayout[2];
-
-    QVector<MediaObjectInfo> mediaObjectInfo;
-
-private:
-    void videoLayout();
-    void mediaPlayerInit();
-    void scanVideoFiles();
 };
 
 #endif // VIDEO_PLAYER_H

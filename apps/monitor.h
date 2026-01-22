@@ -53,6 +53,7 @@ private:
 
     // ⭐ 防止 updateFrame 线程池任务堆积
     std::atomic_bool captureBusy{false};
+    std::atomic_bool previewEnabled{true};
 };
 
 #endif // MONITOR_H

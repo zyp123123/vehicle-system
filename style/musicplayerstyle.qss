@@ -3,7 +3,7 @@ background: "#25242a"
 }
 
 QWidget#listMask {
-border-image: url(:/images/mask.png);
+border-image: url(:/images/musicplayerimages/mask.png);
 background-color: transparent;
 }
 
@@ -34,83 +34,83 @@ border:none;
 }
 
 QPushButton#btn_play {
-border-image:url(:/images/btn_play1.png);
+border-image:url(:/images/musicplayerimages/btn_play1.png);
 }
 
 QPushButton#btn_play:hover {
-border-image:url(:/images/btn_play2.png);
+border-image:url(:/images/musicplayerimages/btn_play2.png);
 }
 
 QPushButton#btn_play:checked {
-border-image:url(:/images/btn_pause1.png);
+border-image:url(:/images/musicplayerimages/btn_pause1.png);
 }
 
 QPushButton#btn_play:checked:hover {
-border-image:url(:/images/btn_pause2.png);
+border-image:url(:/images/musicplayerimages/btn_pause2.png);
 }
 
 QPushButton#btn_previous {
-border-image:url(:/images/btn_previous1.png);
+border-image:url(:/images/musicplayerimages/btn_previous1.png);
 }
 
 QPushButton#btn_previous:hover {
-border-image:url(:/images/btn_previous2.png);
+border-image:url(:/images/musicplayerimages/btn_previous2.png);
 }
 
 QPushButton#btn_next {
-border-image:url(:/images/btn_next1.png);
+border-image:url(:/images/musicplayerimages/btn_next1.png);
 }
 
 QPushButton#btn_next:hover {
-border-image:url(:/images/btn_next2.png);
+border-image:url(:/images/musicplayerimages/btn_next2.png);
 }
 
 QPushButton#btn_favorite {
-border-image:url(:/images/btn_favorite_no.png);
+border-image:url(:/images/musicplayerimages/btn_favorite_no.png);
 }
 
 QPushButton#btn_favorite:checked {
-border-image:url(:/images/btn_favorite_yes.png);
+border-image:url(:/images/musicplayerimages/btn_favorite_yes.png);
 }
 
 QPushButton#btn_menu {
-border-image:url(:/images/btn_menu1.png);
+border-image:url(:/images/musicplayerimages/btn_menu1.png);
 }
 
 QPushButton#btn_menu:hover {
-border-image:url(:/images/btn_menu2.png);
+border-image:url(:/images/musicplayerimages/btn_menu2.png);
 }
 
 QPushButton#btn_mode {
-border-image:url(:/images/btn_listcircle1.png);
+border-image:url(:/images/musicplayerimages/btn_listcircle1.png);
 }
 
 QPushButton#btn_mode:hover {
-border-image:url(:/images/btn_listcircle2.png);
+border-image:url(:/images/musicplayerimages/btn_listcircle2.png);
 }
 
 QPushButton#btn_mode {
-border-image:url(:/images/btn_listcircle1.png);
+border-image:url(:/images/musicplayerimages/btn_listcircle1.png);
 }
 
 QPushButton#btn_mode:hover {
-border-image:url(:/images/btn_listcircle2.png);
+border-image:url(:/images/musicplayerimages/btn_listcircle2.png);
 }
 
 QPushButton#btn_volume {
-border-image:url(:/images/btn_volume1.png);
+border-image:url(:/images/musicplayerimages/btn_volume1.png);
 }
 
 QPushButton#btn_volume:hover {
-border-image:url(:/images/btn_volume2.png);
+border-image:url(:/images/musicplayerimages/btn_volume2.png);
 }
 
 QSlider#durationSlider:handle:horizontal {
-border-image:url(:/images/handle.png);
+border-image:url(:/images/musicplayerimages/handle.png);
 }
 
 QSlider#durationSlider:sub-page:horizontal {
-border-image:url(:/images/sub-page.png);
+border-image:url(:/images/musicplayerimages/sub-page.png);
 }
 
 

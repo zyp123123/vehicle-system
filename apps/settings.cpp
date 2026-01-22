@@ -1,76 +1,127 @@
 #include "settings.h"
+#include "tools/returnbutton.h"
+
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QLabel>
-#include <QMessageBox>
+#include <QFrame>
+#include <QApplication>
+
+/* ================= 工具 ================= */
+
+static void updateStatus(QLabel *label, bool loaded)
+{
+    label->setText(QString("驱动状态：%1").arg(loaded ? "已加载" : "未加载"));
+    label->setStyleSheet(QString(
+        "font-size:16px;"
+        "font-weight:bold;"
+        "color:%1;"
+    ).arg(loaded ? "#2E7D32" : "#C62828"));
+}
+
+static QString driverBtnStyle()
+{
+    return
+        "QPushButton {"
+        "  font-size:16px;"
+        "  height:38px;"
+        "  border-radius:14px;"
+        "  background:#F5F5F5;"
+        "  border:1px solid rgba(0,0,0,40);"
+        "}"
+        "QPushButton:pressed {"
+        "  background:#E0E0E0;"
+        "}";
+}
+
+/* ================= ctor ================= */
 
 Settings::Settings(QWidget *parent)
     : QWidget(parent)
 {
-    this->setFixedSize(800, 480);
+    setFixedSize(800, 480);
+    setAttribute(Qt::WA_StyledBackground, true);
+    setStyleSheet("background:#FAFAFA;");
 
-    QVBoxLayout *layout = new QVBoxLayout(this);
+    /* ===== 主布局 ===== */
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(20, 20, 20, 20);
+    mainLayout->setSpacing(16);
 
-    QLabel *title = new QLabel("系统设置", this);
+    /* ===== 标题 ===== */
+    QLabel *title = new QLabel("系统设置");
     title->setAlignment(Qt::AlignCenter);
-    title->setStyleSheet("font-size: 36px; font-weight: bold;");
-    layout->addWidget(title);
+    title->setStyleSheet("font-size:36px;font-weight:bold;");
+    mainLayout->addWidget(title);
 
-    // ============ 驱动控制区域 ============
+    /* ===== 驱动卡片 ===== */
+    QHBoxLayout *cardsLayout = new QHBoxLayout;
+    cardsLayout->setSpacing(24);
 
-    // ———— DHT11 ————
-    QHBoxLayout *h1 = new QHBoxLayout;
-    h1->addWidget(new QLabel("DHT11 温湿度传感器："));
-    btnLoadDHT11 = new QPushButton("加载驱动");
-    btnUnloadDHT11 = new QPushButton("卸载驱动");
-    h1->addWidget(btnLoadDHT11);
-    h1->addWidget(btnUnloadDHT11);
-    layout->addLayout(h1);
+    auto createCard = [&](const QString &name, QLabel *&statusLabel,
+                          QPushButton *&btnLoad, QPushButton *&btnUnload) {
 
-    // ———— HCSR04 ————
-    QHBoxLayout *h2 = new QHBoxLayout;
-    h2->addWidget(new QLabel("HCSR04 超声波传感器："));
-    btnLoadHCSR04 = new QPushButton("加载驱动");
-    btnUnloadHCSR04 = new QPushButton("卸载驱动");
-    h2->addWidget(btnLoadHCSR04);
-    h2->addWidget(btnUnloadHCSR04);
-    layout->addLayout(h2);
+        QFrame *card = new QFrame;
+        card->setFixedSize(220, 260);
+        card->setAttribute(Qt::WA_StyledBackground, true);
+        card->setStyleSheet(
+            "QFrame {"
+            " background:#FFFFFF;"
+            " border-radius:24px;"
+            " border:1px solid rgba(0,0,0,35);"
+            "}"
+        );
 
-    // ———— SR501 ————
-    QHBoxLayout *h3 = new QHBoxLayout;
-    h3->addWidget(new QLabel("HCSR501 人体红外："));
-    btnLoadSR501 = new QPushButton("加载驱动");
-    btnUnloadSR501 = new QPushButton("卸载驱动");
-    h3->addWidget(btnLoadSR501);
-    h3->addWidget(btnUnloadSR501);
-    layout->addLayout(h3);
+        QLabel *t = new QLabel(name);
+        t->setAlignment(Qt::AlignCenter);
+        t->setStyleSheet("font-size:20px;font-weight:bold;");
 
-    layout->addStretch();
+        statusLabel = new QLabel;
+        statusLabel->setAlignment(Qt::AlignCenter);
 
-    // ============ 退出程序 ============
+        btnLoad = new QPushButton("加载驱动");
+        btnUnload = new QPushButton("卸载驱动");
+        btnLoad->setStyleSheet(driverBtnStyle());
+        btnUnload->setStyleSheet(driverBtnStyle());
 
-    exitBtn = new QPushButton("⚠ 退出程序");
-    exitBtn->setFixedHeight(90);
+        QVBoxLayout *v = new QVBoxLayout(card);
+        v->setContentsMargins(18, 18, 18, 18);
+        v->setSpacing(8);
+        v->addWidget(t);
+        v->addWidget(statusLabel);
+        v->addWidget(btnLoad);
+        v->addWidget(btnUnload);
+
+        cardsLayout->addWidget(card);
+    };
+
+    QPushButton *btnLoadDHT11, *btnUnloadDHT11;
+    QPushButton *btnLoadHCSR04, *btnUnloadHCSR04;
+    QPushButton *btnLoadSR501, *btnUnloadSR501;
+
+    createCard("DHT11 温湿度", dht11Status, btnLoadDHT11, btnUnloadDHT11);
+    createCard("HCSR04 超声波", hcsr04Status, btnLoadHCSR04, btnUnloadHCSR04);
+    createCard("SR501 人体红外", sr501Status, btnLoadSR501, btnUnloadSR501);
+
+    mainLayout->addLayout(cardsLayout);
+    mainLayout->addStretch();
+
+    /* ===== 退出程序 ===== */
+    exitBtn = new QPushButton("⚠ 结束程序");
+    exitBtn->setFixedHeight(80);
     exitBtn->setStyleSheet(
-        "QPushButton { font-size: 28px; border-radius: 20px; background: #FF6666; color: white; }"
-        "QPushButton:pressed { background: #CC3333; }"
+        "QPushButton {"
+        " font-size:26px;"
+        " border-radius:22px;"
+        " background:#FF6666;"
+        " color:white;"
+        "}"
+        "QPushButton:pressed { background:#CC3333; }"
     );
-    layout->addWidget(exitBtn);
+    mainLayout->addWidget(exitBtn);
 
-    // ============ 返回按钮 ============
-
-    backBtn = new QPushButton(this);
-    backBtn->setFixedSize(50, 50);
-    backBtn->setStyleSheet(
-        "QPushButton { border: none; border-radius: 25px;"
-        "border-image: url(:/images/icons/back.png); }"
-    );
-    backBtn->move(10, 10);
-    backBtn->raise();
-
-    // 信号槽绑定
-    connect(backBtn, &QPushButton::clicked, this, &Settings::onBackClicked);
-    connect(exitBtn, &QPushButton::clicked, this, &Settings::onExitClicked);
+    /* ===== 信号 ===== */
+    connect(exitBtn, &QPushButton::clicked,
+            this, &Settings::onExitClicked);
 
     connect(btnLoadDHT11, &QPushButton::clicked, this, &Settings::loadDHT11);
     connect(btnUnloadDHT11, &QPushButton::clicked, this, &Settings::unloadDHT11);
@@ -80,66 +131,83 @@ Settings::Settings(QWidget *parent)
 
     connect(btnLoadSR501, &QPushButton::clicked, this, &Settings::loadSR501);
     connect(btnUnloadSR501, &QPushButton::clicked, this, &Settings::unloadSR501);
+
+    /* ===== 初始化状态（只检测）===== */
+    updateStatus(dht11Status,  isModuleLoaded("dht11"));
+    updateStatus(hcsr04Status, isModuleLoaded("hcsr04"));
+    updateStatus(sr501Status,  isModuleLoaded("sr501"));
+
+    ReturnButton *back = new ReturnButton(this);
+    back->raise();
+    connect(back, &ReturnButton::requestClose,
+            this, &Settings::requestClose);
 }
+
+/* ================= 命令 ================= */
 
 bool Settings::runCommand(const QString &cmd, QString &output)
 {
-    QProcess process;
-    process.start(cmd);
-    process.waitForFinished();
-
-    output = process.readAllStandardOutput() + process.readAllStandardError();
-    return (process.exitCode() == 0);
+    QProcess p;
+    p.start("sh", {"-c", cmd});
+    p.waitForFinished();
+    output = p.readAllStandardOutput() + p.readAllStandardError();
+    return p.exitCode() == 0;
 }
+
+bool Settings::isModuleLoaded(const QString &module)
+{
+    QProcess p;
+    p.start("sh", {"-c", "lsmod | grep " + module});
+    p.waitForFinished();
+    return !p.readAllStandardOutput().isEmpty();
+}
+
+/* ================= 驱动 ================= */
 
 void Settings::loadDHT11()
 {
     QString out;
     runCommand("insmod /home/root/driver/dht11/dht11.ko", out);
-    QMessageBox::information(this, "DHT11", out);
+    updateStatus(dht11Status, isModuleLoaded("dht11"));
 }
 
 void Settings::unloadDHT11()
 {
     QString out;
     runCommand("rmmod dht11", out);
-    QMessageBox::information(this, "DHT11", out);
+    updateStatus(dht11Status, isModuleLoaded("dht11"));
 }
 
 void Settings::loadHCSR04()
 {
     QString out;
     runCommand("insmod /home/root/driver/hcsr04/hcsr04.ko", out);
-    QMessageBox::information(this, "HCSR04", out);
+    updateStatus(hcsr04Status, isModuleLoaded("hcsr04"));
 }
 
 void Settings::unloadHCSR04()
 {
     QString out;
     runCommand("rmmod hcsr04", out);
-    QMessageBox::information(this, "HCSR04", out);
+    updateStatus(hcsr04Status, isModuleLoaded("hcsr04"));
 }
 
 void Settings::loadSR501()
 {
     QString out;
     runCommand("insmod /home/root/driver/hcsr501/sr501.ko", out);
-    QMessageBox::information(this, "SR501", out);
+    updateStatus(sr501Status, isModuleLoaded("sr501"));
 }
 
 void Settings::unloadSR501()
 {
     QString out;
     runCommand("rmmod sr501", out);
-    QMessageBox::information(this, "SR501", out);
-}
-
-void Settings::onBackClicked()
-{
-    emit requestClose();
+    updateStatus(sr501Status, isModuleLoaded("sr501"));
 }
 
 void Settings::onExitClicked()
 {
     emit requestExitApp();
+    qApp->quit();   // ★真正退出程序
 }

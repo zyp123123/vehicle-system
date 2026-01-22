@@ -1,5 +1,5 @@
 QWidget {
-border-image:url(:/images/bg.png);
+border-image:url(:/images/videoplayerimages/bg.png);
 }
 
 QLabel {
@@ -17,7 +17,7 @@ background:transparent;
 }
 
 QWidget#vWidget1 {
-border-image:url(:/images/mask.png);
+border-image:url(:/images/videoplayerimages/mask.png);
 background:#24252a;
 }
 
@@ -55,47 +55,47 @@ border:none;
 
 
 QPushButton#btn_play {
-border-image:url(:/icons/btn_play1.png);
+border-image:url(:/images/videoplayerimages/btn_play1.png);
 }
 
 QPushButton#btn_play:hover {
-border-image:url(:/icons/btn_play2.png);
+border-image:url(:/images/videoplayerimages/btn_play2.png);
 }
 
 QPushButton#btn_play:checked {
-border-image:url(:/icons/btn_pause1.png);
+border-image:url(:/images/videoplayerimages/btn_pause1.png);
 }
 
 QPushButton#btn_play:checked:hover {
-border-image:url(:/icons/btn_pause2.png);
+border-image:url(:/images/videoplayerimages/btn_pause2.png);
 }
 
 QPushButton#btn_next {
-border-image:url(:/icons/btn_next1.png);
+border-image:url(:/images/videoplayerimages/btn_next1.png);
 }
 
 QPushButton#btn_next:hover {
-border-image:url(:/icons/btn_next2.png);
+border-image:url(:/images/videoplayerimages/btn_next2.png);
 }
 
 QPushButton#btn_volumedown {
-border-image:url(:/icons/btn_volumedown1.png);
+border-image:url(:/images/videoplayerimages/btn_volumedown1.png);
 }
 
 QPushButton#btn_volumedown:hover {
-border-image:url(:/icons/btn_volumedown2.png);
+border-image:url(:/images/videoplayerimages/btn_volumedown2.png);
 }
 
 QPushButton#btn_volumeup {
-border-image:url(:/icons/btn_volumeup1.png);
+border-image:url(:/images/videoplayerimages/btn_volumeup1.png);
 }
 
 QPushButton#btn_volumeup:hover {
-border-image:url(:/icons/btn_volumeup2.png);
+border-image:url(:/images/videoplayerimages/btn_volumeup2.png);
 }
 
 QSlider#durationSlider:handle:horizontal {
-border-image:url(:/icons/handle.png);
+border-image:url(:/images/videoplayerimages/handle.png);
 }
 
 QSlider#durationSlider {
@@ -103,14 +103,14 @@ border-image:none;
 }
 
 QSlider#durationSlider:add-page:horizontal {
-border-image:url(:/images/add_page.png);
+border-image:url(:/images/videoplayerimages/add_page.png);
 }
 
 QSlider#volumeSlider {
 border-image:none;
 }
 QSlider#volumeSlider:handle:horizontal {
-border-image:url(:/icons/handle.png);
+border-image:url(:/images/videoplayerimages/handle.png);
 }
 
 QSlider#volumeSlider:handle:horizontal {
@@ -118,21 +118,21 @@ background:transparent;
 }
 
 QSlider#volumeSlider:add-page:horizontal {
-border-image:url(:/images/add_page.png);
+border-image:url(:/images/videoplayerimages/add_page.png);
 }
 
 QPushButton#btn_screen {
-border-image:url(:/icons/btn_fullscreen1.png);
+border-image:url(:/images/videoplayerimages/btn_fullscreen1.png);
 }
 
 QPushButton#btn_screen:hover {
-border-image:url(:/icons/btn_fullscreen2.png);
+border-image:url(:/images/videoplayerimages/btn_fullscreen2.png);
 }
 
 QPushButton#btn_screen:checked {
-border-image:url(:/icons/btn_screen1.png);
+border-image:url(:/images/videoplayerimages/btn_screen1.png);
 }
 
 QPushButton#btn_screen:checked:hover {
-border-image:url(:/icons/btn_screen2.png);
+border-image:url(:/images/videoplayerimages/btn_screen2.png);
 }

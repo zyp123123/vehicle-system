@@ -14,6 +14,7 @@
 #include <QSqlTableModel>
 #include "tools/numberpicker.h"
 #include "tools/switchbutton.h"
+#include "tools/returnbutton.h"
 
 class NumberPicker;
 class SwitchButton;
@@ -102,5 +103,7 @@ private slots:
 
     /* 开关按钮点击 */
     void switchButtonClicked(bool);
+signals:
+    void requestClose();
 };
 #endif // Alarm_H

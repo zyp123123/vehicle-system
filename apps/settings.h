@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QPushButton>
 #include <QProcess>
+#include <QLabel>
 
 class Settings : public QWidget
 {
@@ -16,7 +17,6 @@ signals:
     void requestExitApp();
 
 private slots:
-    void onBackClicked();
     void onExitClicked();
 
     void loadDHT11();
@@ -29,19 +29,14 @@ private slots:
     void unloadSR501();
 
 private:
-    QPushButton *backBtn;
+    QLabel *dht11Status;
+    QLabel *hcsr04Status;
+    QLabel *sr501Status;
+
     QPushButton *exitBtn;
 
-    QPushButton *btnLoadDHT11;
-    QPushButton *btnUnloadDHT11;
-
-    QPushButton *btnLoadHCSR04;
-    QPushButton *btnUnloadHCSR04;
-
-    QPushButton *btnLoadSR501;
-    QPushButton *btnUnloadSR501;
-
     bool runCommand(const QString &cmd, QString &output);
+    bool isModuleLoaded(const QString &module);
 };
 
 #endif // SETTINGS_H

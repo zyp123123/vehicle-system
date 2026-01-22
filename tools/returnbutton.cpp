@@ -9,13 +9,13 @@ ReturnButton::ReturnButton(QWidget *parent)
     // 半透明白色悬浮球样式
     setStyleSheet(
         "QPushButton {"
-        "   background-color: rgba(255, 255, 255, 210);"
-        "   border-radius: 30px;"
-        "   border: 2px solid rgba(255, 255, 255, 230);"
-        "}"
-        "QPushButton:pressed {"
-        "   background-color: rgba(255, 255, 255, 240);"
-        "}"
+           "   background-color: rgba(255, 255, 255, 235);"   /* 接近不透明 */
+           "   border-radius: 30px;"
+           "   border: 2px solid rgba(180, 180, 180, 255);"   /* 关键：灰边 */
+           "}"
+           "QPushButton:pressed {"
+           "   background-color: rgba(245, 245, 245, 255);"
+           "}"
     );
 
     move(15, 15);  // 默认起始位置

@@ -2,6 +2,7 @@
 #include <QDebug>
 #include <QSqlError>
 
+
 Alarm::Alarm(QWidget *parent)
     : QWidget(parent)
 {
@@ -231,6 +232,19 @@ Alarm::Alarm(QWidget *parent)
             SIGNAL(itemClicked(QListWidgetItem*)),
             this,
             SLOT(listWidgetItemClicked(QListWidgetItem*)));
+
+    QFile qss(":/style/alarmstyle.qss");
+    if (qss.open(QFile::ReadOnly)) {
+        setStyleSheet(qss.readAll());
+        qss.close();
+    }
+
+    ReturnButton *back = new ReturnButton(this);
+    back->raise();
+    back->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+    connect(back, &ReturnButton::requestClose, this, [=](){
+        emit requestClose();
+    });
 }
 
 Alarm::~Alarm()

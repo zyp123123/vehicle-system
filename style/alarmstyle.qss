@@ -21,13 +21,13 @@ color:#ee222222;
 }
 
 QPushButton#addAlarm {
-border-image:url(:/icons/addalarm1.png);
+border-image:url(:/images/alarmimages/addalarm1.png);
 background:transparent;
 outline: none;
 }
 
 QPushButton#addAlarm:hover {
-border-image:url(:/icons/addalarm2.png);
+border-image:url(:/images/alarmimages/addalarm2.png);
 }
 
 QPushButton#yesButton {

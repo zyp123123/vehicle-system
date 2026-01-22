@@ -145,6 +145,11 @@ void Monitor::updateFrame()
         QImage copy = img.copy();
 
         QMetaObject::invokeMethod(this, [this, copy]() {
+            if (!previewEnabled) {
+                captureBusy = false;
+                return;   // ⭐ 推流中，丢弃帧
+            }
+
             currentFrame = copy;
             cameraView->setPixmap(QPixmap::fromImage(copy));
             captureBusy = false;
@@ -174,6 +179,7 @@ void Monitor::onStartStream()
 {
     if (isStreaming) return;
 
+    previewEnabled = false;   // ⭐ 关键
     stopLocalPreview();
 
 #ifdef Q_PROCESSOR_ARM
@@ -204,6 +210,7 @@ void Monitor::onStartStream()
         btnStartStream->setEnabled(false);
         btnStopStream->setEnabled(true);
         btnTakePhoto->setEnabled(false);
+        cameraView->clear();   // ⭐ 必须
         cameraView->setText("正在推流...");
     } else {
         cameraView->setText("FFmpeg 启动失败");
@@ -231,6 +238,7 @@ void Monitor::onStopStream()
     btnStartStream->setEnabled(true);
     btnStopStream->setEnabled(false);
 
+    previewEnabled = true;    // ⭐ 恢复
     startLocalPreview();
     btnTakePhoto->setEnabled(frameTimer != nullptr);
 }
