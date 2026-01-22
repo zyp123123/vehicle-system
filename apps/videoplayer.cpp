@@ -91,13 +91,13 @@ void VideoPlayer::videoLayout()
 
     for(int i = 0; i < 3; i ++){
         hWidget[i] = new QWidget (this);
-        hWidget[i]->setAutoFillBackground(true);
+//        hWidget[i]->setAutoFillBackground(true);
         hBoxLayout[i] = new QHBoxLayout ();
     }
 
     for(int i = 0; i < 2; i ++){
         vWidget[i] = new QWidget (this);
-        vWidget[i]->setAutoFillBackground(true);
+//        vWidget[i]->setAutoFillBackground(true);
         vBoxLayout[i] = new QVBoxLayout ();
     }
 

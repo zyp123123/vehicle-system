@@ -24,13 +24,18 @@ else: unix:!android: target.path = /opt/$${TARGET}/bin
 !isEmpty(target.path): INSTALLS += target
 
 RESOURCES += \
-    res.qrc \
     res.qrc
 
 # 自动区分 x86 与 ARM
 
 contains(QT_ARCH, arm) {
     message("🔧 编译架构：ARM 平台 - 使用开发板 OpenCV 库")
+
+    # --- 新增：手动指定 QtCharts 的内部搜索路径 ---
+    # 这一行解决了 ../../src/charts/axis/... 找不到的问题
+    INCLUDEPATH += /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/QtCharts/src/charts
+    INCLUDEPATH += /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/QtCharts/src/charts/axis
+    # ------------------------------------------
 
     INCLUDEPATH += /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/opencv4
     LIBS += -L/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib \

@@ -76,7 +76,14 @@ void MapPage::fillNavigationData(const QString &city, const QString &start, cons
 
 QImage MapPage::captureMapImage()
 {
-    return this->grab().toImage();
+    // 检查指针是否为空
+    if (m_webView) {
+        // 只截取 webView 控件的内容，不包含右侧的面板
+        return m_webView->grab().toImage();
+    }
+
+    // 如果没有 webView，则返回一个空图片
+        return QImage();
 }
 
 void MapPage::setupUI()
@@ -143,7 +150,7 @@ void MapPage::onSetCityClicked()
         QMessageBox::warning(this, "Warning", "Please enter a city!");
         return;
     }
-    m_channel->sendCity(city);
+    m_channel->setCity(city);
 }
 
 void MapPage::updateCityLabel(QString city)
@@ -153,12 +160,12 @@ void MapPage::updateCityLabel(QString city)
 
 void MapPage::onSearch1Changed(const QString &text)
 {
-    m_channel->sendInput_1(text.trimmed());
+    m_channel->inputChanged_1(text.trimmed());
 }
 
 void MapPage::onSearch2Changed(const QString &text)
 {
-    m_channel->sendInput_2(text.trimmed());
+    m_channel->inputChanged_2(text.trimmed());
 }
 
 void MapPage::updateAutoComplete_1(QJsonObject result)
@@ -221,7 +228,7 @@ void MapPage::updateAutoComplete_2(QJsonObject result)
 void MapPage::onStartListClicked(const QModelIndex &index)
 {
     QString locationStr = index.data(Qt::UserRole).toString();
-    m_channel->sendStartLocation(locationStr);
+    m_channel->startlocation(locationStr);
     m_hasStart = true;
     checkRouteStatus();
 }
@@ -229,7 +236,7 @@ void MapPage::onStartListClicked(const QModelIndex &index)
 void MapPage::onEndListClicked(const QModelIndex &index)
 {
     QString locationStr = index.data(Qt::UserRole).toString();
-    m_channel->sendEndLocation(locationStr);
+    m_channel->endlocation(locationStr);
     m_hasEnd = true;
     checkRouteStatus();
 }
@@ -242,7 +249,7 @@ void MapPage::checkRouteStatus()
 void MapPage::onNavButtonClicked()
 {
     if (m_hasStart && m_hasEnd) {
-        m_channel->sendSelectRoute();
+        m_channel->selectRoute();
     }
 }
 

@@ -6,6 +6,8 @@
 #include <QPushButton>
 #include <QWidget>
 
+class MapServer;
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -28,6 +30,8 @@ private:
     QPushButton *btnNext;
 
     int currentIndex;
+
+    MapServer *mapServer;
 };
 
 #endif // MAINWINDOW_H

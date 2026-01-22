@@ -99,10 +99,6 @@ void MapServer::onClientReadyRead()
         mapPage->fillNavigationData(city, start, end);
     }
 
-    // 回复客户端收到指令
-    currentClient->write("ok");
-    currentClient->flush();
-
     // ★★★ 延迟 2 秒发送截图 ★★★
     // 目的：等待网页端路径渲染、动画加载完成后再进行截图
     QTimer::singleShot(2000, this, &MapServer::sendMapImage);

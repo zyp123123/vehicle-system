@@ -1,5 +1,29 @@
-QWidget {
-border-image:url(:/images/videoplayerimages/bg.png);
+/* 1. 设置主窗口背景 */
+VideoPlayer {
+    border-image: url(:/images/videoplayerimages/bg.png);
+}
+
+/* 2. 强制所有容器透明，防止它们显示白色背景 */
+#vWidget0, #vWidget1, #hWidget1, #hWidget2 {
+    border-image: none;
+    background-color: transparent; /* 关键：确保透明 */
+    background: transparent;
+}
+
+/* 3. 视频列表容器的背景（如果你希望它有点半透明感） */
+QListWidget#listWidget {
+    color: white;
+    font-size: 15px;
+    border: none;
+    background-color: rgba(255, 255, 255, 32); /* 32 是透明度，约 12% */
+    border-image: none;
+}
+
+/* 4. 底部控制栏容器 */
+QWidget#vWidget1 {
+    /* 如果你希望底部有一层黑色的遮罩，保留这行 */
+    border-image: url(:/images/videoplayerimages/mask.png);
+    background-color: transparent;
 }
 
 QLabel {

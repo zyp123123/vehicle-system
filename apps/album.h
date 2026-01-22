@@ -3,89 +3,75 @@
 
 #include <QWidget>
 #include <QLabel>
-#include <QStringList>
-#include <QVector>
-#include <QPixmap>
-#include <QFutureWatcher>
+#include <QScrollArea>
+#include <QGridLayout>
+#include <QToolButton>
 #include <QPushButton>
-#include <QHash>
+#include <QFutureWatcher>
 #include <QSet>
+#include <QMap>
 
-class QScrollArea;
-class QGridLayout;
-class QToolButton;
-
-/* -------------------------
- * 相册页面
- * ------------------------ */
 class Album : public QWidget
 {
     Q_OBJECT
+
 public:
     explicit Album(QWidget *parent = nullptr);
     ~Album();
-
-signals:
-    void requestClose();
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
 
-private slots:
-    void onThumbnailReady(int index, const QPixmap &thumb);
-
 private:
-    /* 数据加载与 UI */
+    /* UI 组件 */
+    QScrollArea *scrollArea;
+    QWidget *contentWidget;
+    QGridLayout *gridLayout;
+    QLabel *fullscreenLabel;
+    QPushButton *deleteModeBtn;
+
+    /* 数据与状态 */
+    QStringList imagePaths;
+    QStringList imageNames;
+    QVector<QToolButton*> thumbButtons;
+    QVector<QFutureWatcher<void>*> watchers;
+    QMap<int, QPixmap> thumbCache;
+
+    QRect screenRect;
+    QSize thumbSize;
+    int currentIndex;
+    bool isFullscreen;
+
+    /* 滑动切换相关 */
+    bool dragging;
+    int dragStartX;
+
+    /* 删除模式相关 */
+    bool selectingMode = false;
+    QSet<int> selectedIndexSet;
+
+    /* 私有方法 */
     void loadImageList();
     void buildGrid();
     void startLoadThumbnail(int index);
-
-    /* 全屏显示 */
     void showFullscreenAt(int index);
     void showImageAtIndex(int index);
     void exitFullscreen();
-    int  clampedIndex(int idx) const;
+    int clampedIndex(int idx) const;
 
-    /* 删除模式 */
-    void onDeleteModeClicked();
-    void exitSelectMode();
+    /* 删除功能相关方法 */
     void toggleSelect(int index);
     void updateThumbStyles();
+    void exitSelectMode();
     void deleteSelectedImages();
 
-private:
-    /* ---------- UI ---------- */
-    QScrollArea *scrollArea = nullptr;
-    QWidget     *contentWidget = nullptr;
-    QGridLayout *gridLayout = nullptr;
+private slots:
+    void onThumbnailReady(int index, const QPixmap &thumb);
+    void onDeleteModeClicked();
 
-    QLabel *fullscreenLabel = nullptr;
-
-    QPushButton *deleteModeBtn = nullptr;
-
-    /* ---------- 状态 ---------- */
-    bool isFullscreen = false;
-    int  currentIndex = -1;
-
-    bool dragging = false;
-    int  dragStartX = 0;
-
-    bool selectingMode = false;
-
-    /* ---------- 数据 ---------- */
-    QStringList imagePaths;
-    QStringList imageNames;
-
-    QVector<QToolButton*> thumbButtons;
-    QVector<QFutureWatcher<void>*> watchers;
-    QHash<int, QPixmap> thumbCache;
-
-    QSet<int> selectedIndexSet;
-
-    /* ---------- 配置 ---------- */
-    QSize thumbSize;
-    QRect screenRect;
+signals:
+    void requestClose();
 };
 
 #endif // ALBUM_H

@@ -1,178 +1,107 @@
 ﻿<!doctype html>
 <html>
-
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width">
     <link rel="stylesheet" href="https://cache.amap.com/lbs/static/main1119.css" />
-
-    <!-- 高德安全密钥（必须在API前） -->
+    <style>
+        .amap-logo, .amap-copyright { display: none !important; }
+    </style>
     <script>
+        // ★★★ 必须修改 1：填写你的高德安全密钥 (Security Code) ★★★
         window._AMapSecurityConfig = {
             securityJsCode: "eccf45812b483258d1c6a8902532155a"
         };
     </script>
-
-    <!-- 高德 API -->
-    <script src="https://a.amap.com/jsapi_demos/static/demo-center/js/demoutils.js"></script>
     <script src="https://webapi.amap.com/maps?v=1.4.15&key=3b38af595b172794e9fe2099fbef8a02&plugin=AMap.Driving,AMap.Autocomplete"></script>
-    <script src="https://cache.amap.com/lbs/static/addToolbar.js"></script>
-
-    <!-- Qt 通信文件（qwebchannel.js） -->
-    <script src="qrc:/qwebchannel.js"></script>
-
-    <style>
-        #container {
-            width: 100%;
-            height: 100vh;
-        }
-    </style>
+    <script src="qwebchannel.js"></script>
 </head>
-
 <body>
     <div id="container"></div>
-
-    <script>
-        /*************** 初始化地图 ***************/
+    <script type="text/javascript">
         var map = new AMap.Map("container", {
             resizeEnable: true,
-            center: [116.397428, 39.90923],
             zoom: 13
         });
 
         var driving = new AMap.Driving({
             map: map,
-            showTraffic: true,
             policy: AMap.DrivingPolicy.LEAST_TIME,
-            extensions: "all"
+            showTraffic: true
         });
 
-        var autoComplete = new AMap.Autocomplete({
-            city: "北京"
-        });
+        var autoComplete = new AMap.Autocomplete({ city: '北京' });
+        var mchannel;
+        var startMarker, endMarker;
 
-        var mchannel = null;
+        new QWebChannel(qt.webChannelTransport, function (channel) {
+            mchannel = channel;
+            var pyObj = channel.objects.qtChannel;
 
-        /**************** Qt WebChannel 连接 ****************/
-        window.onload = function () {
-            if (typeof qt !== "undefined") {
-                new QWebChannel(qt.webChannelTransport, function (channel) {
-                    mchannel = channel;
-
-                    const obj = channel.objects.qtChannel;
-                    obj.cityChanged.connect(testSetCity);
-                    obj.inputChanged_1.connect(dealComplete_1);
-                    obj.inputChanged_2.connect(dealComplete_2);
-                    obj.startlocation.connect(_startlocation);
-                    obj.endlocation.connect(_endlocation);
-                    obj.selectRoute.connect(setRoute);
-
-                    getCurCity();
+            pyObj.cityChanged.connect(function(city) {
+                map.setCity(city, function() {
+                    autoComplete.setCity(city);
+                    pyObj.cityChangeResult(city);
                 });
-            } else {
-                console.log("Qt WebChannel not found.");
-            }
-        };
-
-
-        /*************** 城市功能 ***************/
-        function getCurCity() {
-            map.getCity(function (place) {
-                var city = place.city || place.province;
-                autoComplete.setCity(city);
-                mchannel.objects.qtChannel.cityChangeResult(city);
             });
-        }
 
-        function testSetCity(city) {
-            map.setCity(city, function () {
-                getCurCity();
+            // ★★★ 修改重点：增加 status 判断，防止崩溃 ★★★
+            pyObj.inputChanged_1_sig.connect(function(val) {
+                if(!val) return; // 输入为空不搜索
+                autoComplete.search(val, function(status, result) {
+                    // 只有当状态为 complete 且 result 是对象时，才发给 C++
+                    if (status === 'complete' && typeof result === 'object') {
+                        pyObj.getAutocomplete_1(result);
+                    } else {
+                        console.log("搜索失败或Key无效:", status, result);
+                    }
+                });
             });
-        }
 
-
-        /*************** 自动补全 ***************/
-        function dealComplete_1(cont) {
-            autoComplete.search(cont, function (status, result) {
-                mchannel.objects.qtChannel.getAutocomplete_1(result);
+            // ★★★ 修改重点：增加 status 判断，防止崩溃 ★★★
+            pyObj.inputChanged_2_sig.connect(function(val) {
+                if(!val) return;
+                autoComplete.search(val, function(status, result) {
+                    if (status === 'complete' && typeof result === 'object') {
+                        pyObj.getAutocomplete_2(result);
+                    } else {
+                        console.log("搜索失败或Key无效:", status, result);
+                    }
+                });
             });
-        }
 
-        function dealComplete_2(cont) {
-            autoComplete.search(cont, function (status, result) {
-                mchannel.objects.qtChannel.getAutocomplete_2(result);
-            });
-        }
-
-
-        /*************** 导航标记 ***************/
-        var startIcon = new AMap.Icon({
-            size: new AMap.Size(25, 34),
-            image: "http://a.amap.com/jsapi_demos/static/demo-center/icons/dir-marker.png",
-            imageSize: new AMap.Size(135, 40),
-            imageOffset: new AMap.Pixel(-9, -3)
+            pyObj.startlocation_sig.connect(function(loc) { updateMarker('start', loc); });
+            pyObj.endlocation_sig.connect(function(loc) { updateMarker('end', loc); });
+            pyObj.selectRoute_sig.connect(function() { startNav(); });
         });
 
-        var endIcon = new AMap.Icon({
-            size: new AMap.Size(25, 34),
-            image: "http://a.amap.com/jsapi_demos/static/demo-center/icons/dir-marker.png",
-            imageSize: new AMap.Size(135, 40),
-            imageOffset: new AMap.Pixel(-95, -3)
-        });
+        function updateMarker(type, location) {
+            var parts = location.split(",");
+            var lng = parseFloat(parts[0]);
+            var lat = parseFloat(parts[1]);
+            var pos = new AMap.LngLat(lng, lat);
 
-        var startMarker = null;
-        var endMarker = null;
-
-        function _startlocation(location) {
-            const [lng, lat] = location.split(",").map(Number);
-            const pos = new AMap.LngLat(lng, lat);
-
-            if (!startMarker) {
-                startMarker = new AMap.Marker({
-                    position: pos,
-                    icon: startIcon,
-                    map: map
-                });
+            if (type === 'start') {
+                if (startMarker) map.remove(startMarker);
+                startMarker = new AMap.Marker({ position: pos, map: map });
             } else {
-                startMarker.setPosition(pos);
+                if (endMarker) map.remove(endMarker);
+                endMarker = new AMap.Marker({ position: pos, map: map });
             }
-
-            map.setCenter(pos);
+            if(startMarker && endMarker) map.setFitView([startMarker, endMarker]);
         }
 
-        function _endlocation(location) {
-            const [lng, lat] = location.split(",").map(Number);
-            const pos = new AMap.LngLat(lng, lat);
-
-            if (!endMarker) {
-                endMarker = new AMap.Marker({
-                    position: pos,
-                    icon: endIcon,
-                    map: map
-                });
-            } else {
-                endMarker.setPosition(pos);
-            }
-
-            map.setCenter(pos);
-        }
-
-
-        /*************** 导航路线 ***************/
-        function setRoute() {
+        function startNav() {
             if (!startMarker || !endMarker) return;
-
             driving.search(startMarker.getPosition(), endMarker.getPosition(), function (status, result) {
-                if (status === "complete") {
-                    console.log("路线绘制完成");
+                if (status === 'complete') {
+                    console.log('绘制成功');
                 } else {
-                    console.log("导航失败", result);
+                    if(mchannel) mchannel.objects.qtChannel.routeError("规划失败: " + status);
                 }
             });
         }
     </script>
-
 </body>
-
 </html>

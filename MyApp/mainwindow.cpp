@@ -53,23 +53,22 @@ void MainWindow::addPage(QWidget *page)
 
 void MainWindow::createPages()
 {
-    // -------- 页面 0：天气 --------
     addPage(new Weather());
 
-    // -------- 页面 1：地图导航 --------
-    MapPage *mapPage = new MapPage();
+    MapPage *mapPage = new MapPage(this);
     addPage(mapPage);
 
-    // -------- 页面 2：地图 TCP 调试 --------
-    MapDebugPage *debugPage = new MapDebugPage();
+    MapDebugPage *debugPage = new MapDebugPage(this);
     addPage(debugPage);
 
-    // -------- 创建 MapServer 并连接日志到 debugPage --------
-    mapServer = new MapServer(this);
-    mapServer->start(5555);   // 监听端口5555
+    // ★ 正确：把 MapPage 传给 MapServer
+    mapServer = new MapServer(mapPage, this);
+    mapServer->start(5555);
+
     connect(mapServer, &MapServer::logMessage,
             debugPage, &MapDebugPage::appendLog);
 }
+
 
 void MainWindow::showPreviousPage()
 {

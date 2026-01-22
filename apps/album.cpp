@@ -1,50 +1,42 @@
 #include "album.h"
-
-#include <QScrollArea>
-#include <QGridLayout>
 #include <QVBoxLayout>
-#include <QToolButton>
 #include <QDir>
 #include <QFileInfo>
-#include <QDebug>
 #include <QCoreApplication>
 #include <QtConcurrent/QtConcurrent>
 #include <QMouseEvent>
 #include <QKeyEvent>
 #include <QScrollBar>
 #include <QMessageBox>
-#include <QApplication>
+#include <algorithm>
 
 #include "tools/returnbutton.h"
 #include "tools/appthreadpool.h"
 
-/* -------------------------
- * 构造 / 析构
- * ------------------------ */
 Album::Album(QWidget *parent)
-    : QWidget(parent)
+    : QWidget(parent), currentIndex(-1), isFullscreen(false),
+      dragging(false), dragStartX(0)
 {
     setStyleSheet("background-color: #FFFFFF;");
-
     screenRect = QRect(0, 0, 800, 480);
     setFixedSize(screenRect.size());
 
-    /* ---------- 全屏预览 ---------- */
+    // 1. 全屏预览层
     fullscreenLabel = new QLabel(this);
     fullscreenLabel->setGeometry(screenRect);
     fullscreenLabel->setAlignment(Qt::AlignCenter);
     fullscreenLabel->setVisible(false);
     fullscreenLabel->setStyleSheet("background-color: black;");
-    fullscreenLabel->setScaledContents(false);
     fullscreenLabel->installEventFilter(this);
 
-    /* ---------- 滚动区域 ---------- */
+    // 2. 滚动区域初始化
     scrollArea = new QScrollArea(this);
     scrollArea->setGeometry(screenRect);
     scrollArea->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    scrollArea->setWidgetResizable(true);
+    scrollArea->viewport()->setAttribute(Qt::WA_AcceptTouchEvents, true);
     scrollArea->viewport()->installEventFilter(this);
+    scrollArea->setWidgetResizable(true);
 
     contentWidget = new QWidget;
     gridLayout = new QGridLayout(contentWidget);
@@ -53,72 +45,52 @@ Album::Album(QWidget *parent)
     gridLayout->setAlignment(Qt::AlignLeft | Qt::AlignTop);
     scrollArea->setWidget(contentWidget);
 
-    /* ---------- 加载数据 ---------- */
-    loadImageList();
-
-    int cols = 4;
+    // 3. 计算缩略图尺寸 (4列)
     int spacing = gridLayout->spacing();
-    int usableWidth = screenRect.width() - spacing * (cols - 1) - 16;
-    int cellW = usableWidth / cols;
-    int cellH = cellW * 0.625;
-    thumbSize = QSize(cellW, cellH);
+    int usableWidth = screenRect.width() - spacing * 3 - 16;
+    int cellW = usableWidth / 4;
+    thumbSize = QSize(cellW, cellW * 0.625);
 
+    // 4. 加载数据与构建界面
+    loadImageList();
     buildGrid();
 
-    /* ---------- 删除按钮 ---------- */
+    // 5. 功能按钮
     deleteModeBtn = new QPushButton(this);
     deleteModeBtn->setFixedSize(50, 50);
-    deleteModeBtn->move(730, 10);
-    deleteModeBtn->setStyleSheet(
-        "border-image: url(:/images/icons/delete.png);"
-        "background: rgba(0,0,0,100);"
-        "border-radius:25px;"
-    );
-    deleteModeBtn->raise();
-    connect(deleteModeBtn, &QPushButton::clicked,
-            this, &Album::onDeleteModeClicked);
+    deleteModeBtn->move(740, 10);
+    deleteModeBtn->setStyleSheet("border-image: url(:/images/icons/delete.png); background: rgba(0,0,0,100); border-radius:25px;");
+    connect(deleteModeBtn, &QPushButton::clicked, this, &Album::onDeleteModeClicked);
 
-    /* ---------- 返回按钮 ---------- */
     ReturnButton *back = new ReturnButton(this);
     back->raise();
-    back->setAttribute(Qt::WA_TransparentForMouseEvents, false);
-    connect(back, &ReturnButton::requestClose, this, [=](){
-        emit requestClose();
-    });
+    connect(back, &ReturnButton::requestClose, this, [=](){ emit requestClose(); });
 }
 
 Album::~Album()
 {
     for (auto w : watchers) {
-        if (!w) continue;
-        w->disconnect();
-        if (w->isRunning()) {
-            w->cancel();
-            w->waitForFinished();
+        if (w) {
+            w->disconnect();
+            if (w->isRunning()) {
+                w->cancel();
+                w->waitForFinished();
+            }
+            delete w;
         }
-        delete w;
     }
 }
 
-/* -------------------------
- * 加载图片列表
- * ------------------------ */
 void Album::loadImageList()
 {
+    imagePaths.clear();
+    imageNames.clear();
     QString folder = QCoreApplication::applicationDirPath() + "/myAlbum";
     QDir dir(folder);
+    if (!dir.exists()) return;
 
-    if (!dir.exists()) {
-        qWarning() << "Album folder not found:" << folder;
-        return;
-    }
-
-    QStringList filters = {
-        "*.jpg","*.jpeg","*.png","*.bmp","*.gif"
-    };
-
-    QFileInfoList files =
-        dir.entryInfoList(filters, QDir::Files, QDir::Name);
+    QStringList filters = {"*.jpg", "*.jpeg", "*.png", "*.bmp", "*.gif"};
+    QFileInfoList files = dir.entryInfoList(filters, QDir::Files, QDir::Name);
 
     for (const QFileInfo &fi : files) {
         imagePaths.append(fi.absoluteFilePath());
@@ -126,139 +98,98 @@ void Album::loadImageList()
     }
 }
 
-/* -------------------------
- * 构建缩略图网格
- * ------------------------ */
 void Album::buildGrid()
 {
-    QLayoutItem *child;
-    while ((child = gridLayout->takeAt(0)) != nullptr) {
-        delete child->widget();
-        delete child;
+    // 清理旧布局
+    QLayoutItem *item;
+    while ((item = gridLayout->takeAt(0)) != nullptr) {
+        if (item->widget()) delete item->widget();
+        delete item;
     }
 
+    // 清理旧 Watchers
     for (auto w : watchers) {
-        if (!w) continue;
-        w->disconnect();
-        w->cancel();
-        w->waitForFinished();
-        delete w;
+        if (w) { w->disconnect(); w->cancel(); w->waitForFinished(); delete w; }
     }
-
     watchers.clear();
     thumbButtons.clear();
     thumbCache.clear();
 
-    int count = imagePaths.size();
-    if (count == 0) {
-        QLabel *lbl = new QLabel(
-            "相册为空\n请将图片放到 myAlbum 文件夹",
-            contentWidget
-        );
-        lbl->setStyleSheet("font-size:16px;color:#666;");
+    if (imagePaths.isEmpty()) {
+        QLabel *lbl = new QLabel("相册为空", contentWidget);
         gridLayout->addWidget(lbl, 0, 0);
         return;
     }
 
+    int count = imagePaths.size();
+    thumbButtons.resize(count);
     watchers.resize(count);
     watchers.fill(nullptr);
-    thumbButtons.resize(count);
-
-    int cols = 4;
-    int r = 0, c = 0;
 
     for (int i = 0; i < count; ++i) {
         QWidget *cell = new QWidget;
         QVBoxLayout *v = new QVBoxLayout(cell);
-        v->setAlignment(Qt::AlignHCenter | Qt::AlignTop);
+        v->setContentsMargins(0, 0, 0, 0);
 
         QToolButton *thumb = new QToolButton;
         thumb->setFixedSize(thumbSize);
         thumb->setIconSize(thumbSize);
-        thumb->setStyleSheet(
-            "QToolButton { border:2px solid #CCC; background:#F8F8F8; }"
-        );
+        thumb->setStyleSheet("QToolButton { border:2px solid #CCCCCC; border-radius:6px; background: #F8F8F8; }");
 
         QLabel *name = new QLabel(imageNames.value(i));
         name->setAlignment(Qt::AlignCenter);
 
-        v->addWidget(thumb);
+        v->addWidget(thumb, 0, Qt::AlignHCenter);
         v->addWidget(name);
 
         connect(thumb, &QToolButton::clicked, this, [this, i](){
-            selectingMode ? toggleSelect(i) : showFullscreenAt(i);
+            if (selectingMode) toggleSelect(i);
+            else showFullscreenAt(i);
         });
 
         thumbButtons[i] = thumb;
-        gridLayout->addWidget(cell, r, c);
-
-        if (++c >= cols) { c = 0; ++r; }
-
+        gridLayout->addWidget(cell, i / 4, i % 4);
         startLoadThumbnail(i);
     }
+    contentWidget->adjustSize();
 }
 
-/* -------------------------
- * 异步加载缩略图
- * ------------------------ */
 void Album::startLoadThumbnail(int index)
 {
     if (index < 0 || index >= imagePaths.size()) return;
 
-    if (watchers[index]) {
-        watchers[index]->disconnect();
-        watchers[index]->cancel();
-        watchers[index]->waitForFinished();
-        delete watchers[index];
-    }
-
-    QFutureWatcher<void> *watcher =
-        new QFutureWatcher<void>(this);
+    QFutureWatcher<void> *watcher = new QFutureWatcher<void>(this);
     watchers[index] = watcher;
 
-    QString path = imagePaths[index];
-
-    connect(watcher, &QFutureWatcher<void>::finished, this, [=](){
-        if (thumbCache.contains(index) && thumbButtons[index]) {
-            thumbButtons[index]->setIcon(
-                QIcon(thumbCache.value(index))
-            );
+    connect(watcher, &QFutureWatcher<void>::finished, this, [this, index]() {
+        if (thumbCache.contains(index)) {
+            if (thumbButtons[index]) thumbButtons[index]->setIcon(QIcon(thumbCache[index]));
         }
     });
 
-    watcher->setFuture(QtConcurrent::run(
-        AppThreadPool::instance(),
-        [=](){
-            QPixmap pix(path);
-            if (pix.isNull()) return;
-            QPixmap thumb = pix.scaled(
-                thumbSize, Qt::KeepAspectRatio,
-                Qt::SmoothTransformation
-            );
-            QMetaObject::invokeMethod(
-                this, "onThumbnailReady",
-                Qt::QueuedConnection,
-                Q_ARG(int, index),
-                Q_ARG(QPixmap, thumb)
-            );
-        }
-    ));
+    QString path = imagePaths.at(index);
+    QFuture<void> future = QtConcurrent::run(AppThreadPool::instance(), [this, path, index]() {
+        QPixmap pix(path);
+        if (pix.isNull()) return;
+        QPixmap thumb = pix.scaled(thumbSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        QMetaObject::invokeMethod(this, "onThumbnailReady", Qt::QueuedConnection,
+                                  Q_ARG(int, index), Q_ARG(QPixmap, thumb));
+    });
+    watcher->setFuture(future);
 }
 
 void Album::onThumbnailReady(int index, const QPixmap &thumb)
 {
-    thumbCache[index] = thumb;
-    if (thumbButtons[index])
+    thumbCache.insert(index, thumb);
+    if (index < thumbButtons.size() && thumbButtons[index]) {
         thumbButtons[index]->setIcon(QIcon(thumb));
+    }
 }
 
-/* -------------------------
- * 全屏查看 / 切换
- * ------------------------ */
 void Album::showFullscreenAt(int index)
 {
     currentIndex = index;
-    showImageAtIndex(index);
+    showImageAtIndex(currentIndex);
     isFullscreen = true;
     fullscreenLabel->setVisible(true);
     fullscreenLabel->raise();
@@ -266,62 +197,86 @@ void Album::showFullscreenAt(int index)
 
 void Album::showImageAtIndex(int index)
 {
-    QPixmap pix(imagePaths[index]);
-    QSize screen = screenRect.size();
+    if (index < 0 || index >= imagePaths.size()) return;
+    QPixmap pix(imagePaths.at(index));
+    if (pix.isNull()) return;
 
-    fullscreenLabel->setPixmap(
-        pix.scaled(screen, Qt::KeepAspectRatio,
-                   Qt::SmoothTransformation)
-    );
+    if (pix.width() <= screenRect.width() && pix.height() <= screenRect.height()) {
+        fullscreenLabel->setPixmap(pix);
+    } else {
+        fullscreenLabel->setPixmap(pix.scaled(screenRect.size(), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
 }
 
 void Album::exitFullscreen()
 {
     isFullscreen = false;
     fullscreenLabel->setVisible(false);
-    currentIndex = -1;
 }
 
-/* -------------------------
- * 工具函数
- * ------------------------ */
+bool Album::eventFilter(QObject *obj, QEvent *event)
+{
+    // 缩略图滚动逻辑
+    if (obj == scrollArea->viewport()) {
+        static QPoint last;
+        if (event->type() == QEvent::MouseButtonPress) {
+            last = static_cast<QMouseEvent*>(event)->pos();
+            return true;
+        } else if (event->type() == QEvent::MouseMove) {
+            QPoint now = static_cast<QMouseEvent*>(event)->pos();
+            int dy = last.y() - now.y();
+            scrollArea->verticalScrollBar()->setValue(scrollArea->verticalScrollBar()->value() + dy);
+            last = now;
+            return true;
+        }
+    }
+
+    // 全屏手势逻辑
+    if (obj == fullscreenLabel) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            dragStartX = static_cast<QMouseEvent*>(event)->pos().x();
+            return true;
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+            int dx = static_cast<QMouseEvent*>(event)->pos().x() - dragStartX;
+            if (qAbs(dx) < 20) exitFullscreen();
+            else {
+                currentIndex = (dx < 0) ? clampedIndex(currentIndex + 1) : clampedIndex(currentIndex - 1);
+                showImageAtIndex(currentIndex);
+            }
+            return true;
+        }
+    }
+    return QWidget::eventFilter(obj, event);
+}
+
+void Album::keyPressEvent(QKeyEvent *event)
+{
+    if (isFullscreen) {
+        if (event->key() == Qt::Key_Right) { currentIndex = clampedIndex(currentIndex + 1); showImageAtIndex(currentIndex); }
+        else if (event->key() == Qt::Key_Left) { currentIndex = clampedIndex(currentIndex - 1); showImageAtIndex(currentIndex); }
+        else if (event->key() == Qt::Key_Escape) exitFullscreen();
+    } else QWidget::keyPressEvent(event);
+}
+
 int Album::clampedIndex(int idx) const
 {
-    if (idx < 0) return 0;
-    if (idx >= imagePaths.size()) return imagePaths.size() - 1;
-    return idx;
+    return qBound(0, idx, (int)imagePaths.size() - 1);
 }
 
-/* -------------------------
- * 删除模式
- * ------------------------ */
 void Album::onDeleteModeClicked()
 {
     if (!selectingMode) {
         selectingMode = true;
         selectedIndexSet.clear();
         updateThumbStyles();
-        deleteModeBtn->setStyleSheet(
-            "border-image: url(:/images/icons/delete_confirm.png);"
-            "background: rgba(255,0,0,150);"
-        );
-        return;
+        deleteModeBtn->setStyleSheet("border-image: url(:/images/icons/delete_confirm.png); background: rgba(255,0,0,150); border-radius:25px;");
+    } else {
+        if (selectedIndexSet.isEmpty()) exitSelectMode();
+        else {
+            if (QMessageBox::question(this, "删除", "确定删除选中的图片吗？") == QMessageBox::Yes) deleteSelectedImages();
+            exitSelectMode();
+        }
     }
-
-    if (selectedIndexSet.isEmpty()) {
-        exitSelectMode();
-        return;
-    }
-
-    if (QMessageBox::question(
-            this, "删除照片",
-            QString("确定删除 %1 张照片？")
-                .arg(selectedIndexSet.size()))
-        == QMessageBox::Yes) {
-        deleteSelectedImages();
-    }
-
-    exitSelectMode();
 }
 
 void Album::exitSelectMode()
@@ -329,31 +284,24 @@ void Album::exitSelectMode()
     selectingMode = false;
     selectedIndexSet.clear();
     updateThumbStyles();
-    deleteModeBtn->setStyleSheet(
-        "border-image: url(:/images/icons/delete.png);"
-        "background: rgba(0,0,0,100);"
-    );
+    deleteModeBtn->setStyleSheet("border-image: url(:/images/icons/delete.png); background: rgba(0,0,0,100); border-radius:25px;");
 }
 
 void Album::toggleSelect(int index)
 {
-    if (selectedIndexSet.contains(index)) {
-        selectedIndexSet.remove(index);
-    } else {
-        selectedIndexSet.insert(index);
-    }
+    if (selectedIndexSet.contains(index)) selectedIndexSet.remove(index);
+    else selectedIndexSet.insert(index);
     updateThumbStyles();
 }
 
 void Album::updateThumbStyles()
 {
-    for (int i = 0; i < thumbButtons.size(); ++i) {
+    for (int i = 0; i < thumbButtons.size(); i++) {
         if (!thumbButtons[i]) continue;
-        thumbButtons[i]->setStyleSheet(
-            selectedIndexSet.contains(i)
-            ? "QToolButton { border:3px solid #409EFF; }"
-            : "QToolButton { border:2px solid #CCC; }"
-        );
+        if (selectingMode && selectedIndexSet.contains(i))
+            thumbButtons[i]->setStyleSheet("QToolButton { border:3px solid #409EFF; border-radius:6px; background:#F0F8FF; }");
+        else
+            thumbButtons[i]->setStyleSheet("QToolButton { border:2px solid #CCCCCC; border-radius:6px; background:#F8F8F8; }");
     }
 }
 
@@ -361,31 +309,10 @@ void Album::deleteSelectedImages()
 {
     QList<int> list = selectedIndexSet.values();
     std::sort(list.begin(), list.end(), std::greater<int>());
-
-    for (int idx : list) {
-        QFile::remove(imagePaths[idx]);
-        imagePaths.removeAt(idx);
-        imageNames.removeAt(idx);
-        delete watchers.takeAt(idx);
-        thumbButtons.removeAt(idx);
+    for (int index : list) {
+        QFile::remove(imagePaths[index]);
+        imagePaths.removeAt(index);
+        imageNames.removeAt(index);
     }
-
     buildGrid();
-}
-
-/* -------------------------
- * 事件过滤
- * ------------------------ */
-bool Album::eventFilter(QObject *obj, QEvent *event)
-{
-    // 目前不处理，交给父类
-    return QWidget::eventFilter(obj, event);
-}
-
-/* -------------------------
- * 键盘事件
- * ------------------------ */
-void Album::keyPressEvent(QKeyEvent *event)
-{
-    QWidget::keyPressEvent(event);
 }
