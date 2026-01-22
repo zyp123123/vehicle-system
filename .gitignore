@@ -1,0 +1,27 @@
+# ===== Qt =====
+*.pro.user
+*.pro.user.*
+.qmake.stash
+moc_*.cpp
+ui_*.h
+qrc_*.cpp
+
+# ===== Build output =====
+build*/
+*.o
+*.obj
+*.so
+*.a
+*.dll
+*.exe
+
+# ===== Qt Creator =====
+*.autosave
+
+# ===== IDE =====
+.vscode/
+.idea/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
