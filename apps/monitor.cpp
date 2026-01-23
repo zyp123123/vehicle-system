@@ -100,7 +100,7 @@ void Monitor::startLocalPreview()
     QString device = "/dev/video0";
 #endif
 
-    if (!v4l2Camera.openDevice(device.toStdString(), 1280, 720)) {
+    if (!v4l2Camera.openDevice(device.toStdString(), 640, 480)) {
         cameraView->setText("无法打开摄像头");
         return;
     }
@@ -124,37 +124,20 @@ void Monitor::stopLocalPreview()
 
 void Monitor::updateFrame()
 {
-    if (captureBusy.exchange(true))
-        return;
-
-    QtConcurrent::run(AppThreadPool::instance(), [this]() {
-
-        cv::Mat frame;
-        if (!v4l2Camera.readFrame(frame)) {
-            QMetaObject::invokeMethod(this, [this](){
-                captureBusy = false;
-            }, Qt::QueuedConnection);
+    cv::Mat frame;
+        if (!v4l2Camera.readFrame(frame))
             return;
-        }
 
-        cv::Mat rgb;
-        cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
+        cv::cvtColor(frame, frame, cv::COLOR_BGR2RGB);
 
-        QImage img(rgb.data, rgb.cols, rgb.rows,
-                   rgb.step, QImage::Format_RGB888);
-        QImage copy = img.copy();
+        QImage img(frame.data,
+                   frame.cols,
+                   frame.rows,
+                   frame.step,
+                   QImage::Format_RGB888);
 
-        QMetaObject::invokeMethod(this, [this, copy]() {
-            if (!previewEnabled) {
-                captureBusy = false;
-                return;   // ⭐ 推流中，丢弃帧
-            }
-
-            currentFrame = copy;
-            cameraView->setPixmap(QPixmap::fromImage(copy));
-            captureBusy = false;
-        }, Qt::QueuedConnection);
-    });
+        cameraView->setPixmap(QPixmap::fromImage(img));
+        currentFrame = img.copy(); // 只有拍照才 copy
 }
 
 void Monitor::onTakeBitmap()
@@ -179,7 +162,7 @@ void Monitor::onStartStream()
 {
     if (isStreaming) return;
 
-    previewEnabled = false;   // ⭐ 关键
+    previewEnabled = false;
     stopLocalPreview();
 
 #ifdef Q_PROCESSOR_ARM
@@ -192,13 +175,28 @@ void Monitor::onStartStream()
     QString rtmpUrl = "rtmp://192.168.50.128/live/stream";
 
     QStringList args {
-        "-f","v4l2","-input_format","mjpeg",
-        "-video_size","320x240","-framerate","15",
+        "-use_wallclock_as_timestamps","1",
+
+        "-f","v4l2",
+        "-input_format","mjpeg",
+        "-video_size","640x360",
+        "-framerate","30",
         "-i",device,
-        "-c:v","libx264","-preset","ultrafast",
-        "-tune","zerolatency","-b:v","400k",
-        "-g","30","-fflags","nobuffer",
-        "-rtbufsize","20M","-f","flv",rtmpUrl
+
+        "-vf","scale=320:240",
+        "-r","10",
+
+        "-c:v","libx264",
+        "-preset","ultrafast",
+        "-tune","zerolatency",
+        "-x264-params","keyint=10:min-keyint=10:scenecut=0",
+        "-pix_fmt","yuv420p",
+
+        "-b:v","200k",
+        "-bufsize","400k",
+
+        "-f","flv",
+        rtmpUrl
     };
 
     ffmpegProc = new QProcess(this);
@@ -210,7 +208,6 @@ void Monitor::onStartStream()
         btnStartStream->setEnabled(false);
         btnStopStream->setEnabled(true);
         btnTakePhoto->setEnabled(false);
-        cameraView->clear();   // ⭐ 必须
         cameraView->setText("正在推流...");
     } else {
         cameraView->setText("FFmpeg 启动失败");

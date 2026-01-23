@@ -1,184 +1,171 @@
 #include "sentinel.h"
-#include "tools/returnbutton.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
-#include <QDateTime>
 #include <QCoreApplication>
+#include <QDateTime>
 #include <QDir>
-#include <QDebug>
-
 #include <fcntl.h>
 #include <unistd.h>
-
-/* ================= ctor / dtor ================= */
+#include <QThread>
+#include <opencv2/opencv.hpp>
+#include <QDebug>
+#include <QtConcurrent/QtConcurrent>
+#include <QApplication>
+#include "tools/returnbutton.h"
+#include "tools/appthreadpool.h"
 
 Sentinel::Sentinel(QWidget *parent)
     : QWidget(parent)
 {
-    setFixedSize(800, 480);
-    setStyleSheet("background:#111; color:white;");
+    this->setFixedSize(800, 480);
 
     QVBoxLayout *main = new QVBoxLayout(this);
-    main->setContentsMargins(20, 20, 20, 20);
-    main->setSpacing(15);
 
-    /* ---------- 标题 ---------- */
-    QLabel *title = new QLabel("安防哨兵");
-    title->setAlignment(Qt::AlignCenter);
-    title->setStyleSheet("font-size:34px; font-weight:bold;");
-    main->addWidget(title);
-
-    /* ---------- 状态 ---------- */
-    statusLabel = new QLabel("状态：安全");
+    // 顶部提示文本
+    statusLabel = new QLabel("等待动作感应...", this);
+    statusLabel->setStyleSheet("font-size:32px; color:white; background:black;");
     statusLabel->setAlignment(Qt::AlignCenter);
-    statusLabel->setStyleSheet(
-        "font-size:36px;"
-        "background:#222;"
-        "border-radius:12px;"
-        "padding:20px;"
-    );
+    statusLabel->setFixedHeight(120);
     main->addWidget(statusLabel);
 
-    /* ---------- 历史 ---------- */
-    historyBox = new QTextEdit;
+    // 历史记录
+    historyBox = new QTextEdit(this);
     historyBox->setReadOnly(true);
-    historyBox->setStyleSheet(
-        "background:#000;"
-        "border-radius:10px;"
-        "font-size:18px;"
-    );
-    main->addWidget(historyBox, 1);
+    historyBox->setStyleSheet("font-size:22px; background:#202020; color:#eeeeee;");
+    main->addWidget(historyBox);
 
-    /* ---------- 按钮 ---------- */
-    QHBoxLayout *btns = new QHBoxLayout;
-    viewAlbumBtn = new QPushButton("查看抓拍记录");
-    viewAlbumBtn->setFixedHeight(60);
+    // 查看相册按钮
+    viewAlbumBtn = new QPushButton("查看相册", this);
     viewAlbumBtn->setStyleSheet(
-        "font-size:22px;"
-        "background:#3b82f6;"
-        "border-radius:12px;"
+        "QPushButton { font-size:26px; background:#444; color:white; padding:10px; border-radius:8px; }"
+        "QPushButton:hover { background:#666; }"
     );
-    btns->addStretch();
-    btns->addWidget(viewAlbumBtn);
-    btns->addStretch();
-    main->addLayout(btns);
+    connect(viewAlbumBtn, &QPushButton::clicked, this, &Sentinel::onViewAlbumClicked);
+    main->addWidget(viewAlbumBtn);
 
-    connect(viewAlbumBtn, &QPushButton::clicked,
-            this, &Sentinel::onViewAlbumClicked);
-
-    /* ---------- 返回按钮 ---------- */
+    // 创建返回按钮
     ReturnButton *back = new ReturnButton(this);
     back->raise();
-    connect(back, &ReturnButton::requestClose,
-            this, &Sentinel::onBackClicked);
+    back->setStyleSheet(back->styleSheet() + "z-index: 9999;");
+    back->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+    connect(back, &ReturnButton::requestClose, this, [=](){
+        emit requestClose();
+    });
 
-    /* ---------- 打开 PIR ---------- */
-    sensorFd = ::open("/dev/sr501", O_RDONLY | O_NONBLOCK);
-    if (sensorFd < 0)
-        qWarning() << "无法打开 /dev/sr501";
+    // 打开 SR501 传感器
+    sensorFd = ::open("/dev/sr501", O_RDONLY);
+    if (sensorFd < 0) {
+        statusLabel->setText("无法打开 /dev/sr501");
+    }
 
-    /* ---------- 打开摄像头 ---------- */
-#ifdef Q_PROCESSOR_ARM
-    camera.openDevice("/dev/video2", 640, 480);
-#else
-    camera.openDevice("/dev/video0", 640, 480);
-#endif
-
-    /* ---------- 定时检测 ---------- */
+    // 定时检测
     checkTimer = new QTimer(this);
-    connect(checkTimer, &QTimer::timeout,
-            this, &Sentinel::checkSensor);
-    checkTimer->start(200);
+    connect(checkTimer, &QTimer::timeout, this, &Sentinel::checkSensor);
+    checkTimer->start(80);   // 80ms 一次
 }
 
 Sentinel::~Sentinel()
 {
-    if (checkTimer)
-        checkTimer->stop();
-
     if (sensorFd >= 0)
         ::close(sensorFd);
-
-    camera.closeDevice();
 }
-
-/* ================= PIR 检测 ================= */
 
 void Sentinel::checkSensor()
 {
-    if (sensorFd < 0)
+    if (sensorFd < 0) return;
+
+    char val;
+    if (::read(sensorFd, &val, 1) <= 0)
         return;
 
-    char buf;
-    int ret = ::read(sensorFd, &buf, 1);
-    if (ret <= 0)
+    if (locked) {
+        if (lockTimer.elapsed() > 5000) {
+            locked = false;
+            statusLabel->setText("等待动作感应...");
+        }
         return;
+    }
 
-    /* 防抖：3 秒内只触发一次 */
-    if (locked && lockTimer.elapsed() < 3000)
-        return;
+    if (val == '1') {
+        locked = true;
+        lockTimer.restart();
 
-    locked = true;
-    lockTimer.restart();
+        statusLabel->setText("⚠ 有人靠近！正在抓拍...");
 
-    QString now = QDateTime::currentDateTime()
-                      .toString("yyyy-MM-dd HH:mm:ss");
-
-    statusLabel->setText("⚠ 有人靠近！");
-    statusLabel->setStyleSheet(
-        "font-size:36px;"
-        "background:#b91c1c;"
-        "border-radius:12px;"
-        "padding:20px;"
-    );
-
-    historyBox->append("[" + now + "] 检测到人体活动");
-
-    captureEvidence();
-
-    /* 3 秒后恢复 */
-    QTimer::singleShot(3000, this, [=](){
-        statusLabel->setText("状态：安全");
-        statusLabel->setStyleSheet(
-            "font-size:36px;"
-            "background:#222;"
-            "border-radius:12px;"
-            "padding:20px;"
+        // 投递线程池任务
+        QtConcurrent::run(
+            AppThreadPool::instance(),
+            [this]() {
+                captureEvidence();
+            }
         );
-        locked = false;
-    });
-}
 
-/* ================= 拍照存证 ================= */
+        historyBox->append(
+            QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss")
+            + "  有人经过，开始抓拍"
+        );
+    }
+}
 
 void Sentinel::captureEvidence()
 {
-    cv::Mat frame;
-    if (!camera.readFrame(frame))
+#ifdef Q_PROCESSOR_ARM
+    QString device = "/dev/video2";
+#else
+    QString device = "/dev/video0";
+#endif
+
+    V4L2Capture camera;   // 局部对象
+
+    if (!camera.openDevice(device.toStdString(), 640, 480)) {
+        qDebug() << "[Sentinel] 摄像头打开失败";
         return;
+    }
+
+    cv::Mat frame;
+    QImage resultImg;
+
+    for (int i = 0; i < 15; ++i) {
+        if (camera.readFrame(frame) && !frame.empty() && i >= 4) {
+            cv::Mat rgb;
+            cv::cvtColor(frame, rgb, cv::COLOR_BGR2RGB);
+            resultImg = QImage(
+                rgb.data, rgb.cols, rgb.rows, rgb.step,
+                QImage::Format_RGB888
+            ).copy();
+            break;
+        }
+        QThread::msleep(50);
+    }
+
+    camera.closeDevice();
+
+    if (resultImg.isNull()) {
+        QMetaObject::invokeMethod(this, [=]() {
+            historyBox->append(" -> 抓拍失败");
+        });
+        return;
+    }
 
     QString dir = QCoreApplication::applicationDirPath() + "/myAlbum";
     QDir().mkpath(dir);
+    QString file = dir + "/sentinel_" +
+        QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss") + ".png";
 
-    QString file =
-        dir + "/sentinel_" +
-        QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss") +
-        ".jpg";
+    bool ok = resultImg.save(file);
 
-    cv::imwrite(file.toStdString(), frame);
-
-    historyBox->append("  └─ 已抓拍：" + QFileInfo(file).fileName());
-}
-
-/* ================= UI ================= */
-
-void Sentinel::onViewAlbumClicked()
-{
-    emit openAlbum();
+    QMetaObject::invokeMethod(this, [=]() {
+        historyBox->append(ok ? " -> 抓拍成功" : " -> 保存失败");
+    });
 }
 
 void Sentinel::onBackClicked()
 {
     emit requestClose();
+}
+
+void Sentinel::onViewAlbumClicked()
+{
+    emit openAlbum();
 }

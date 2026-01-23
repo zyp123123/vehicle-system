@@ -9,6 +9,7 @@
 #include <QScrollBar>
 #include <QMessageBox>
 #include <algorithm>
+#include <QImageReader>
 
 #include "tools/returnbutton.h"
 #include "tools/appthreadpool.h"
@@ -130,27 +131,42 @@ void Album::buildGrid()
         QWidget *cell = new QWidget;
         QVBoxLayout *v = new QVBoxLayout(cell);
         v->setContentsMargins(0, 0, 0, 0);
+        v->setSpacing(4);
 
+        // 缩略图
         QToolButton *thumb = new QToolButton;
         thumb->setFixedSize(thumbSize);
         thumb->setIconSize(thumbSize);
         thumb->setStyleSheet("QToolButton { border:2px solid #CCCCCC; border-radius:6px; background: #F8F8F8; }");
 
-        QLabel *name = new QLabel(imageNames.value(i));
+        // 图片名字
+        QLabel *name = new QLabel;
         name->setAlignment(Qt::AlignCenter);
+        name->setFixedWidth(thumbSize.width());  // 固定宽度
+        name->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Preferred);
+        name->setWordWrap(false);
 
+        // 手动省略文字
+        QFontMetrics fm(name->font());
+        QString elided = fm.elidedText(imageNames.value(i), Qt::ElideRight, thumbSize.width());
+        name->setText(elided);
+
+        // 添加到布局
         v->addWidget(thumb, 0, Qt::AlignHCenter);
         v->addWidget(name);
 
-        connect(thumb, &QToolButton::clicked, this, [this, i](){
+        // 点击事件
+        connect(thumb, &QToolButton::clicked, this, [this, i]() {
             if (selectingMode) toggleSelect(i);
             else showFullscreenAt(i);
         });
 
         thumbButtons[i] = thumb;
         gridLayout->addWidget(cell, i / 4, i % 4);
-        startLoadThumbnail(i);
+
+        startLoadThumbnail(i);  // 异步加载缩略图
     }
+
     contentWidget->adjustSize();
 }
 
@@ -163,20 +179,30 @@ void Album::startLoadThumbnail(int index)
 
     connect(watcher, &QFutureWatcher<void>::finished, this, [this, index]() {
         if (thumbCache.contains(index)) {
-            if (thumbButtons[index]) thumbButtons[index]->setIcon(QIcon(thumbCache[index]));
+            if (index < thumbButtons.size() && thumbButtons[index])
+                thumbButtons[index]->setIcon(QIcon(thumbCache[index]));
         }
     });
 
     QString path = imagePaths.at(index);
+
     QFuture<void> future = QtConcurrent::run(AppThreadPool::instance(), [this, path, index]() {
-        QPixmap pix(path);
-        if (pix.isNull()) return;
-        QPixmap thumb = pix.scaled(thumbSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+        QImageReader reader(path);
+        reader.setAutoTransform(true);
+        reader.setScaledSize(thumbSize);          // 直接读取缩略图大小
+        QImage img = reader.read();
+        if (img.isNull()) return;
+
+        QPixmap thumb = QPixmap::fromImage(img);
+
+        // 更新 UI
         QMetaObject::invokeMethod(this, "onThumbnailReady", Qt::QueuedConnection,
                                   Q_ARG(int, index), Q_ARG(QPixmap, thumb));
     });
+
     watcher->setFuture(future);
 }
+
 
 void Album::onThumbnailReady(int index, const QPixmap &thumb)
 {
