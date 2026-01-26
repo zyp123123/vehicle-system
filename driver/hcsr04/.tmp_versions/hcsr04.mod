@@ -1,0 +1,2 @@
+/home/zyp/linux/vehicle-system/vehicle-system/driver/hcsr04/hcsr04.ko
+/home/zyp/linux/vehicle-system/vehicle-system/driver/hcsr04/hcsr04.o

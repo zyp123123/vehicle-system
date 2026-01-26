@@ -145,13 +145,18 @@ static int hcsr04_probe(struct platform_device *pdev)
     ret = devm_request_irq(dev, d->irq, hcsr04_irq, 
                            IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING, 
                            "hcsr04", d);
-    if (ret) return ret;
-
+                           
     d->misc.minor = MISC_DYNAMIC_MINOR;
-    d->misc.name = "hcsr04";
-    d->misc.fops = &hcsr04_fops;
+    d->misc.name  = "hcsr04";
+    d->misc.fops  = &hcsr04_fops;
 
-    return misc_register(&d->misc);
+    ret = misc_register(&d->misc);
+    if (ret)
+        return ret;
+
+    platform_set_drvdata(pdev, d);   // ⭐⭐⭐ 必须有
+
+    return 0;
 }
 
 static int hcsr04_remove(struct platform_device *pdev)

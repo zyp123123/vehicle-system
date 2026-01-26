@@ -1,0 +1,1 @@
+cmd_/home/zyp/linux/vehicle-system/vehicle-system/driver/hcsr04/hcsr04.ko := arm-linux-gnueabihf-ld -EL -r  -T ./scripts/module-common.lds --build-id  -o /home/zyp/linux/vehicle-system/vehicle-system/driver/hcsr04/hcsr04.ko /home/zyp/linux/vehicle-system/vehicle-system/driver/hcsr04/hcsr04.o /home/zyp/linux/vehicle-system/vehicle-system/driver/hcsr04/hcsr04.mod.o
